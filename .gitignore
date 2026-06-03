@@ -1,0 +1,13 @@
+# OS / editor cruft
+.DS_Store
+*.swp
+*~
+
+# Python
+__pycache__/
+*.pyc
+
+# Temp corpora used during a build (never commit someone's writing samples)
+/tmp/
+corpus*.txt
+*.corpus
