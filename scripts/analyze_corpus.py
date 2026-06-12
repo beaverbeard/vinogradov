@@ -107,6 +107,57 @@ def pct(n, total):
     return f"{(100.0 * n / total):.0f}%" if total else "0%"
 
 
+def ngram_counts(samples, n, min_count=3):
+    """Частотные n-граммы по предложениям (не пересекают границу предложения).
+
+    N-граммы из одних стоп-слов отбрасываются — остаются содержательные обороты.
+    """
+    grams = Counter()
+    for s in samples:
+        for sent in SENT_SPLIT_RE.split(s.lower()):
+            tokens = WORD_RE.findall(sent)
+            for i in range(len(tokens) - n + 1):
+                gram = tokens[i:i + n]
+                if all(t in STOPWORDS for t in gram):
+                    continue
+                grams[" ".join(gram)] += 1
+    return [(g, c) for g, c in grams.most_common() if c >= min_count]
+
+
+def sentence_openers(samples, min_count=2):
+    """Первые слова предложений — сильный маркер голоса (как автор открывает мысль)."""
+    openers = Counter()
+    total = 0
+    for s in samples:
+        for sent in SENT_SPLIT_RE.split(s):
+            tokens = WORD_RE.findall(sent)
+            if tokens:
+                openers[tokens[0].lower()] += 1
+                total += 1
+    top = [(w, c) for w, c in openers.most_common(10) if c >= min_count]
+    return top, total
+
+
+def classify_ending(sample):
+    """Чем автор заканчивает образец: точка, смайл, ничего — это привычка."""
+    tail = sample.rstrip()
+    if not tail:
+        return "пусто"
+    if tail.endswith("...") or tail[-1] == "…":
+        return "многоточие"
+    if EMOJI_RE.match(tail[-1]):
+        return "эмодзи"
+    if tail[-1] == ")":
+        return "скобка/смайл"
+    if tail[-1] == ".":
+        return "точка"
+    if tail[-1] == "!":
+        return "восклицание"
+    if tail[-1] == "?":
+        return "вопрос"
+    return "без знака"
+
+
 def main():
     if len(sys.argv) < 2:
         print("usage: analyze_corpus.py <file|->", file=sys.stderr)
@@ -145,6 +196,11 @@ def main():
     fillers = phrase_counts(lower, FILLER_CANDIDATES_RU + FILLER_CANDIDATES_EN)
     markers = count_markers(joined, TEXT_MARKERS)
     emojis = Counter(EMOJI_RE.findall(joined))
+
+    bigrams = ngram_counts(samples, 2)
+    trigrams = ngram_counts(samples, 3)
+    openers, sent_total = sentence_openers(samples)
+    endings = Counter(classify_ending(s) for s in samples)
 
     # Пунктуационные привычки
     em_dash = joined.count("—") + joined.count("--")
@@ -189,6 +245,29 @@ def main():
     w(f"- Восклицания: {exclaim}  |  Вопросы: {question}  |  Сокращения (don't/it's): {contractions}")
     w("")
 
+    w("## Характерные обороты (n-граммы, ≥3 раз)")
+    if bigrams or trigrams:
+        for g, n in trigrams[:5]:
+            w(f"- «{g}» — {n} раз")
+        shown_tri = {g for g, _ in trigrams[:5]}
+        for g, n in bigrams[:10]:
+            # не дублировать биграммы, целиком сидящие внутри показанных триграмм
+            if any(g in t for t in shown_tri):
+                continue
+            w(f"- «{g}» — {n} раз")
+    else:
+        w("- устойчивых оборотов не найдено (мало образцов или очень разнообразный текст)")
+    w("")
+
+    w("## Начала и концовки")
+    if openers:
+        w("- Первые слова предложений: " + ", ".join(f"«{wd}»×{n}" for wd, n in openers))
+    else:
+        w("- повторяющихся первых слов не найдено")
+    w("- Концовки образцов: " + ", ".join(
+        f"{kind} {pct(n, total_samples)}" for kind, n in endings.most_common()))
+    w("")
+
     w("## Топ частотных слов (без стоп-слов)")
     w(", ".join(f"{wd}×{n}" for wd, n in top_words) or "—")
     w("")
@@ -204,6 +283,18 @@ def main():
     if emojis or markers:
         top_m = ", ".join(f"`{x}`" for x, _ in (markers + emojis).most_common(3))
         w(f"- Маркеры иронии для тональности «ироничнее»: {top_m}.")
+    if bigrams or trigrams:
+        top_tri = trigrams[:2]
+        tri_set = {g for g, _ in top_tri}
+        top_bi = [(g, c) for g, c in bigrams if not any(g in t for t in tri_set)][:3]
+        top_g = ", ".join(f"«{g}»" for g, _ in (top_tri + top_bi))
+        w(f"- Характерные обороты для секции голоса: {top_g}.")
+    if openers:
+        top_o = ", ".join(f"«{wd}»" for wd, _ in openers[:3])
+        w(f"- Типичные открытия мысли: {top_o}.")
+    no_dot = endings.get("без знака", 0) + endings.get("скобка/смайл", 0) + endings.get("эмодзи", 0)
+    if no_dot > total_samples / 2:
+        w("- Автор обычно НЕ ставит точку в конце → не заканчивать тексты «причёсанной» точкой.")
     if em_dash > total_samples:
         w("- Автор САМ активно использует тире → не баним тире жёстко, только защищаем от AI-накопления.")
     print("\n".join(out))
