@@ -1,6 +1,10 @@
 MIT License
 
-Copyright (c) 2026 Alexey Ponomar
+Copyright (c) 2026 Alexey Ponomar — original "voice-dna-builder" engine
+  (deterministic corpus analyzer, interview→build workflow, voice-profile.json)
+Copyright (c) 2026 Rodion Scryabin / beaverbeard — "Vinogradov" fork & enhancements
+  (4-layer idiostyle report, function-word deviation, burstiness/TTR/Yule's K,
+   stylistic-vs-topical n-gram split, methodology)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

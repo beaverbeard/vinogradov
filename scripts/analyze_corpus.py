@@ -1,12 +1,26 @@
 #!/usr/bin/env python3
-"""Анализ корпуса писательских образцов для извлечения Voice DNA.
+"""Анализ корпуса писательских образцов для извлечения Voice DNA (идиостиля).
 
-Детерминированно считает то, что человек не сможет посчитать на глаз:
-частоту вводных слов, среднюю длину, ритм предложений, маркеры иронии,
-пунктуационные привычки. Результат — markdown-отчёт, который модель
-использует, чтобы заполнить шаблон персонального скилла.
+Детерминированно считает то, что человек не посчитает на глаз. Отчёт разложен по
+четырём слоям идиостиля В.В. Виноградова — это каркас voice-DNA-скила:
 
-Зависимостей нет (только stdlib). Язык корпуса любой.
+  1. Лексический   — словарь, функциональные слова (подпись), обороты, богатство.
+  2. Синтаксический — длина и ритм предложений (burstiness), пунктуация.
+  3. Композиционный — абзацы, зачины, концовки.
+  4. Образ автора   — маркеры тона/иронии, регистр (сигналы, не вердикт).
+
+Принцип: скрипт считает СИГНАЛЫ, интерпретацию (модели аргументации, домены
+метафор, off-brand) делает LLM по on-brand-фрагментам. Сюда не пихаем хрупкие
+регулярки-«детекторы смысла».
+
+Анти-шум:
+  - n-граммы фильтруются по document-frequency (в скольких РАЗНЫХ образцах
+    встречаются) — иначе фраза, повторённая в одном посте, лезет в «подпись»;
+  - функциональные слова даются как ОТКЛОНЕНИЕ от нормы русского (мини-Burrows):
+    различает не сырая частота «и/в/не», а над/недо-употребление;
+  - стрелки и вариейшн-селекторы не считаются маркерами иронии.
+
+Зависимостей нет (только stdlib). Язык корпуса любой (списки — RU-first + EN).
 
 Использование:
     python3 analyze_corpus.py samples.txt
@@ -16,36 +30,69 @@
 иначе — пустая строка. Если ничего не найдено, каждая строка = образец.
 """
 
+import math
 import re
 import sys
 from collections import Counter
 
-# Вводные/маркерные слова, за которыми стоит следить отдельно (RU + EN).
-# Это не баны, а кандидаты в "подпись голоса" — то, что человек повторяет.
+# Дискурсивные маркеры / вводные (RU + EN) — кандидаты в "подпись голоса".
 FILLER_CANDIDATES_RU = [
     "ну", "вот", "короче", "типа", "ребят", "ага", "ну да", "вроде",
     "кажется", "похоже", "блин", "ладно", "слушай", "смотри", "в общем",
-    "то есть", "как бы", "честно", "по сути", "на самом деле",
+    "то есть", "как бы", "честно", "по сути", "на самом деле", "кстати",
+    "получается", "это я к чему", "вот в чём дело", "как я уже говорил",
 ]
 FILLER_CANDIDATES_EN = [
     "well", "so", "anyway", "honestly", "kinda", "actually", "basically",
     "i mean", "look", "right", "ok", "yeah", "tbh", "like",
 ]
 
+# Базовая частота функциональных слов в РЯ (‰, на 1000 токенов) — приблизительно,
+# по частотным словарям (НКРЯ / Ляшевская-Шаров). Нужна, чтобы считать ОТКЛОНЕНИЕ:
+# различает автора не сырая частота служебного слова, а над/недо-употребление
+# относительно нормы (упрощённый Burrows' Delta без полноценной эталонной выборки).
+BASELINE_FREQ = {
+    "и": 35.0, "в": 31.0, "не": 18.0, "на": 15.0, "что": 14.0, "с": 12.5,
+    "я": 11.0, "как": 9.0, "он": 9.0, "а": 8.5, "к": 7.0, "по": 7.0,
+    "это": 6.5, "но": 5.5, "то": 5.0, "из": 5.0, "у": 5.0, "за": 4.5,
+    "так": 4.5, "же": 4.5, "мы": 4.5, "от": 4.0, "вы": 4.0, "для": 4.0,
+    "если": 4.0, "бы": 3.5, "уже": 3.0, "только": 3.0, "ещё": 3.0,
+    "чтобы": 3.0, "вот": 1.5, "ну": 1.0,
+}
+
 # Маркеры иронии/тона — эмодзи и текстовые.
 TEXT_MARKERS = ["¯\\_(ツ)_/¯", ":)", ":(", "))", ")))", ":-)", "xD", "P.S.", "PS:", "P.S"]
 
+# Регистровые маркеры — сигнал, в каком пласте лексики живёт голос.
+REGISTER_COLLOQUIAL = [
+    "блин", "фигня", "херня", "хрень", "нафиг", "нафига", "дофига", "дохрена",
+    "офигенно", "крутой", "крутая", "круто", "чувак", "штука", "прикол",
+    "бомба", "жесть", "капец", "норм", "щас", "че", "чё", "ваще",
+]
+REGISTER_FORMAL = [
+    "является", "осуществляется", "осуществлять", "данный", "данном",
+    "следует", "необходимо", "посредством", "вследствие", "в целях",
+    "реализация", "обеспечение", "способствует", "представляет собой",
+]
+
+# Зачины-сигналы: начать предложение с контраста/связки — это голос,
+# а не «в/на/и» (просто частые предлоги). Их выделяем отдельно.
+CONTRAST_OPENERS = {"но", "а", "и", "если", "это", "поэтому", "кстати", "ну",
+                    "вот", "зато", "однако", "хотя", "потому", "значит", "так"}
+
+# Эмодзи БЕЗ стрелок (стрелки = структура, не тон) и без служебных кодпоинтов.
 EMOJI_RE = re.compile(
     "["
     "\U0001F300-\U0001FAFF"
-    "\U00002600-\U000027BF"
+    "\U00002600-\U000026FF"
+    "\U00002700-\U000027BF"
     "\U0001F000-\U0001F0FF"
-    "\U00002190-\U000021FF"
     "\U00002B00-\U00002BFF"
-    "️"
     "]",
     flags=re.UNICODE,
 )
+ARROW_RE = re.compile("[←-⇿]", flags=re.UNICODE)  # блок стрелок (→ ← ↔ …)
+EMOJI_SKIP = {"️", "︎", "‍"}  # variation selectors, ZWJ — не эмодзи
 
 WORD_RE = re.compile(r"[\w'’-]+", re.UNICODE)
 SENT_SPLIT_RE = re.compile(r"[.!?…]+(?:\s|$)")
@@ -107,21 +154,32 @@ def pct(n, total):
     return f"{(100.0 * n / total):.0f}%" if total else "0%"
 
 
-def ngram_counts(samples, n, min_count=3):
-    """Частотные n-граммы по предложениям (не пересекают границу предложения).
+def ngram_counts(samples, n, min_count=3, min_df=2):
+    """Частотные n-граммы по предложениям с фильтром document-frequency.
 
-    N-граммы из одних стоп-слов отбрасываются — остаются содержательные обороты.
+    Возвращает (gram, count, df), где df = число РАЗНЫХ образцов, в которых
+    встретился оборот. Фраза, повторённая внутри одного поста (df=1), —
+    топик-шум, а не голос: отсекаем по min_df. N-граммы из одних стоп-слов
+    тоже отбрасываем.
     """
-    grams = Counter()
+    total = Counter()
+    doc = Counter()
     for s in samples:
+        seen = set()
         for sent in SENT_SPLIT_RE.split(s.lower()):
             tokens = WORD_RE.findall(sent)
             for i in range(len(tokens) - n + 1):
                 gram = tokens[i:i + n]
                 if all(t in STOPWORDS for t in gram):
                     continue
-                grams[" ".join(gram)] += 1
-    return [(g, c) for g, c in grams.most_common() if c >= min_count]
+                g = " ".join(gram)
+                total[g] += 1
+                seen.add(g)
+        for g in seen:
+            doc[g] += 1
+    res = [(g, c, doc[g]) for g, c in total.most_common()
+           if c >= min_count and doc[g] >= min_df]
+    return res
 
 
 def sentence_openers(samples, min_count=2):
@@ -134,7 +192,7 @@ def sentence_openers(samples, min_count=2):
             if tokens:
                 openers[tokens[0].lower()] += 1
                 total += 1
-    top = [(w, c) for w, c in openers.most_common(10) if c >= min_count]
+    top = [(w, c) for w, c in openers.most_common(12) if c >= min_count]
     return top, total
 
 
@@ -158,6 +216,96 @@ def classify_ending(sample):
     return "без знака"
 
 
+def sentence_lengths(samples):
+    """Длины всех предложений в словах — основа ритма."""
+    lengths = []
+    for s in samples:
+        for part in SENT_SPLIT_RE.split(s):
+            part = part.strip()
+            if part:
+                lengths.append(len(WORD_RE.findall(part)))
+    return [x for x in lengths if x]
+
+
+def burstiness(lengths):
+    """Ритм: среднее, σ, коэффициент вариации CV=σ/μ.
+
+    CV — стилометрически сильнее среднего: ловит «игру длиной» (чередование
+    рубленых и длинных фраз), которую среднее прячет. CV<0.5 — ровный ритм,
+    CV>0.8 — выраженная игра длиной.
+    """
+    n = len(lengths)
+    if n < 2:
+        return {"mean": (lengths[0] if lengths else 0), "std": 0.0, "cv": 0.0}
+    mean = sum(lengths) / n
+    var = sum((x - mean) ** 2 for x in lengths) / n
+    std = var ** 0.5
+    return {"mean": mean, "std": std, "cv": (std / mean if mean else 0.0)}
+
+
+def lexical_richness(all_words):
+    """Богатство словаря: TTR (с поправкой на длину), hapax-доля, Yule's K."""
+    n = len(all_words)
+    freq = Counter(all_words)
+    v = len(freq)
+    if n < 2 or v < 1:
+        return {"tokens": n, "types": v, "ttr": 0, "ttr_norm": 0, "hapax_ratio": 0, "yule_k": 0}
+    hapax = sum(1 for c in freq.values() if c == 1)
+    sum_f2 = sum(c * c for c in freq.values())
+    yule_k = 10000 * (sum_f2 - n) / (n * n)
+    return {
+        "tokens": n,
+        "types": v,
+        "ttr": v / n,
+        "ttr_norm": math.log(v) / math.log(n),
+        "hapax_ratio": hapax / v,
+        "yule_k": yule_k,
+    }
+
+
+def function_word_deviation(all_words, min_count=8):
+    """Над/недо-употребление служебных слов против нормы РЯ (мини-Burrows).
+
+    Возвращает (over, under): списки (слово, ‰набл, отношение к норме). Сырая
+    частота «и/в/не» бесполезна (она высока у всех) — различает отклонение.
+    """
+    n = len(all_words)
+    if not n:
+        return [], []
+    freq = Counter(all_words)
+    rows = []
+    for word, base in BASELINE_FREQ.items():
+        obs = 1000.0 * freq.get(word, 0) / n
+        if freq.get(word, 0) >= min_count and base > 0:
+            rows.append((word, obs, obs / base))
+    over = sorted([r for r in rows if r[2] >= 1.4], key=lambda r: -r[2])
+    under = sorted([r for r in rows if r[2] <= 0.6], key=lambda r: r[2])
+    return over, under
+
+
+def paragraph_stats(samples):
+    """Композиция: ритм абзацев. Доля одно-предложенческих абзацев = «дышит»."""
+    paras = []
+    for s in samples:
+        for p in re.split(r"\n\s*\n", s):
+            p = p.strip()
+            if p:
+                paras.append(p)
+    if not paras:
+        return None
+    sent_per_para = []
+    for p in paras:
+        sents = [x for x in SENT_SPLIT_RE.split(p) if x.strip()]
+        sent_per_para.append(max(1, len(sents)))
+    one_liners = sum(1 for x in sent_per_para if x == 1)
+    return {
+        "paras": len(paras),
+        "avg_chars": sum(len(p) for p in paras) / len(paras),
+        "avg_sents": sum(sent_per_para) / len(sent_per_para),
+        "one_liner_share": one_liners / len(paras),
+    }
+
+
 def main():
     if len(sys.argv) < 2:
         print("usage: analyze_corpus.py <file|->", file=sys.stderr)
@@ -172,37 +320,57 @@ def main():
     joined = "\n".join(samples)
     lower = joined.lower()
     total_samples = len(samples)
+    # для маленьких корпусов df-порог снижаем, иначе обороты пропадут
+    min_df = 3 if total_samples >= 30 else 2
 
     lengths = [len(s) for s in samples]
     avg_len = sum(lengths) / total_samples
     median_len = sorted(lengths)[total_samples // 2]
 
     # Ритм предложений
-    sent_lengths = []
-    for s in samples:
-        for part in SENT_SPLIT_RE.split(s):
-            part = part.strip()
-            if part:
-                sent_lengths.append(len(WORD_RE.findall(part)))
-    avg_sent = sum(sent_lengths) / len(sent_lengths) if sent_lengths else 0
+    sent_lengths = sentence_lengths(samples)
+    rhythm = burstiness(sent_lengths)
     short_sents = sum(1 for x in sent_lengths if x <= 5)
     long_sents = sum(1 for x in sent_lengths if x >= 20)
 
-    # Частотные слова (без стоп-слов)
-    words = [w.lower() for w in WORD_RE.findall(lower) if len(w) > 2]
-    content_words = [w for w in words if w not in STOPWORDS]
+    # Словарь
+    all_words = [w.lower() for w in WORD_RE.findall(lower)]
+    content_words = [w for w in all_words if len(w) > 2 and w not in STOPWORDS]
+
+    # Document-frequency по ТОКЕНАМ — чтобы отличить стилистический оборот
+    # (все слова частотны по корпусу) от тематического (есть редкое слово:
+    # имя, термин). Топик-шум вроде «луиса рейеса» содержит редкий токен.
+    token_df = Counter()
+    for s in samples:
+        for tok in set(w.lower() for w in WORD_RE.findall(s)):
+            token_df[tok] += 1
+    common_df = max(4, int(total_samples * 0.10))
+    common_tokens = {tok for tok, df in token_df.items() if df >= common_df}
+
+    def is_stylistic(gram):
+        """Оборот стилистический, если все его токены частотны (нет редкого имени/термина)."""
+        return all(tok in common_tokens for tok in gram.split())
     top_words = Counter(content_words).most_common(25)
+    richness = lexical_richness(all_words)
+    fw_over, fw_under = function_word_deviation(all_words)
 
     fillers = phrase_counts(lower, FILLER_CANDIDATES_RU + FILLER_CANDIDATES_EN)
     markers = count_markers(joined, TEXT_MARKERS)
-    emojis = Counter(EMOJI_RE.findall(joined))
+    emojis = Counter(c for c in EMOJI_RE.findall(joined) if c not in EMOJI_SKIP)
+    arrows = len(ARROW_RE.findall(joined))
 
-    bigrams = ngram_counts(samples, 2)
-    trigrams = ngram_counts(samples, 3)
+    bigrams = ngram_counts(samples, 2, min_df=min_df)
+    trigrams = ngram_counts(samples, 3, min_df=min_df)
+    quadgrams = ngram_counts(samples, 4, min_count=2, min_df=min_df)
     openers, sent_total = sentence_openers(samples)
     endings = Counter(classify_ending(s) for s in samples)
+    paras = paragraph_stats(samples)
 
-    # Пунктуационные привычки
+    # Регистр
+    colloquial = sum(phrase_counts(lower, REGISTER_COLLOQUIAL).values())
+    formal = sum(phrase_counts(lower, REGISTER_FORMAL).values())
+
+    # Пунктуационная сигнатура
     em_dash = joined.count("—") + joined.count("--")
     ellipsis = joined.count("...") + joined.count("…")
     parens = min(joined.count("("), joined.count(")"))
@@ -212,17 +380,25 @@ def main():
 
     out = []
     w = out.append
-    w("# Voice DNA — отчёт по корпусу\n")
-    w(f"**Образцов:** {total_samples}  |  **Символов всего:** {len(joined)}\n")
+    w("# Voice DNA — отчёт по корпусу (идиостиль по 4 слоям Виноградова)\n")
+    w(f"**Образцов:** {total_samples}  |  **Символов:** {len(joined)}  |  "
+      f"**Слов:** {richness['tokens']}  |  df-порог оборотов: ≥{min_df} образцов\n")
 
-    w("## Длина и ритм")
-    w(f"- Средняя длина образца: **{avg_len:.0f}** символов (медиана {median_len})")
-    w(f"- Средняя длина предложения: **{avg_sent:.1f}** слов")
-    w(f"- Коротких предложений (≤5 слов): {short_sents} ({pct(short_sents, len(sent_lengths))})")
-    w(f"- Длинных предложений (≥20 слов): {long_sents} ({pct(long_sents, len(sent_lengths))})")
-    w("  → высокая доля и тех и других = намеренная игра длиной (хорошо для голоса)\n")
+    # ── Слой 1. Лексический ───────────────────────────────────────────────
+    w("## Слой 1 — Лексический (словарный отпечаток)\n")
 
-    w("## Вводные / слова-подписи (кандидаты в DNA)")
+    w("**Подпись по служебным словам (отклонение от нормы РЯ, не сырая частота):**")
+    if fw_over:
+        w("  _Над-употребляет (×норма):_ "
+          + ", ".join(f"`{wd}` ×{r:.1f} ({obs:.1f}‰)" for wd, obs, r in fw_over[:8]))
+    if fw_under:
+        w("  _Недо-употребляет:_ "
+          + ", ".join(f"`{wd}` ×{r:.1f}" for wd, obs, r in fw_under[:5]))
+    if not (fw_over or fw_under):
+        w("  служебные слова — в пределах нормы РЯ, яркой подписи нет")
+    w("")
+
+    w("**Дискурсивные маркеры / вводные (кандидаты в DNA):**")
     if fillers:
         for word, n in fillers.most_common():
             w(f"- `{word}` — {n} раз")
@@ -230,7 +406,83 @@ def main():
         w("- не найдено заметных вводных — голос, видимо, более «сухой»")
     w("")
 
-    w("## Маркеры тона / иронии")
+    all_grams = quadgrams + trigrams + bigrams
+    styl_all = [t for t in all_grams if is_stylistic(t[0])]
+    topical = [t for t in all_grams if not is_stylistic(t[0])]
+
+    def dedupe(items, k):
+        """Длинные обороты вперёд; биграмму внутри показанного длинного — пропустить."""
+        res, shown = [], []
+        for g, n, df in items:
+            if any(g in s for s in shown):
+                continue
+            res.append((g, n, df))
+            shown.append(g)
+            if len(res) >= k:
+                break
+        return res
+
+    styl_show = dedupe(styl_all, 12)
+    w("**Стилистические обороты — ПОДПИСЬ голоса (все слова частотны; «оборот — N раз / M образцов»):**")
+    if styl_show:
+        for g, n, df in styl_show:
+            w(f"- «{g}» — {n} / {df}")
+    else:
+        w("- устойчивых стилистических оборотов не найдено")
+    if topical:
+        w("")
+        w("_Тематические обороты (есть редкое слово — имя/термин; это ТЕМЫ, в голос НЕ тащить):_ "
+          + ", ".join(f"«{g}»" for g, _, _ in topical[:6]))
+    w("")
+
+    w("**Богатство словаря:**")
+    w(f"- TTR: {richness['ttr']:.3f} (нормир. logV/logN: {richness['ttr_norm']:.3f})  |  "
+      f"hapax-доля: {richness['hapax_ratio']:.2f}  |  Yule's K: {richness['yule_k']:.0f}")
+    w("  → выше TTR/hapax = богаче словарь; выше Yule's K = больше повторов (уже словарь)")
+    w("")
+
+    w("**Топ контентных слов — это ТЕМЫ, не голос (в отпечаток не тащить):**")
+    w(", ".join(f"{wd}×{n}" for wd, n in top_words) or "—")
+    w("")
+
+    # ── Слой 2. Синтаксический ────────────────────────────────────────────
+    w("## Слой 2 — Синтаксический (ритм и пунктуация)\n")
+    w(f"- Средняя длина образца: **{avg_len:.0f}** символов (медиана {median_len})")
+    w(f"- Длина предложения: среднее **{rhythm['mean']:.1f}** слов, σ {rhythm['std']:.1f}")
+    w(f"- **Burstiness (CV = σ/μ): {rhythm['cv']:.2f}** — "
+      + ("выраженная игра длиной (рубленые ↔ длинные)" if rhythm['cv'] >= 0.8
+         else "умеренная вариация" if rhythm['cv'] >= 0.5
+         else "ровный, монотонный ритм"))
+    w(f"- Коротких предложений (≤5 слов): {short_sents} ({pct(short_sents, len(sent_lengths))})  |  "
+      f"длинных (≥20): {long_sents} ({pct(long_sents, len(sent_lengths))})")
+    w(f"- Пунктуация — тире: {em_dash}, скобки-вставки: {parens}, многоточие: {ellipsis}, "
+      f"восклицания: {exclaim}, вопросы: {question}, сокращения: {contractions}")
+    w("")
+
+    # ── Слой 3. Композиционный ────────────────────────────────────────────
+    w("## Слой 3 — Композиционный (абзацы, зачины, концовки)\n")
+    if paras:
+        one_liner_n = round(paras['one_liner_share'] * paras['paras'])
+        w(f"- Абзацев: {paras['paras']}  |  средний абзац: {paras['avg_chars']:.0f} симв / "
+          f"{paras['avg_sents']:.1f} предл  |  одно-предложенческих: "
+          f"{pct(one_liner_n, paras['paras'])}")
+        w("  → высокая доля одно-предложенческих абзацев = текст «дышит», блоки разной длины")
+    if openers:
+        contrast = [(wd, n) for wd, n in openers if wd in CONTRAST_OPENERS]
+        other = [(wd, n) for wd, n in openers if wd not in CONTRAST_OPENERS]
+        if contrast:
+            w("- Зачины-сигналы (вход в мысль с контраста/связки): "
+              + ", ".join(f"«{wd}»×{n}" for wd, n in contrast))
+        if other:
+            w("- Прочие частые зачины (часто просто предлоги — слабый сигнал): "
+              + ", ".join(f"«{wd}»×{n}" for wd, n in other[:5]))
+    w("- Концовки образцов: " + ", ".join(
+        f"{kind} {pct(n, total_samples)}" for kind, n in endings.most_common()))
+    w("")
+
+    # ── Слой 4. Образ автора ──────────────────────────────────────────────
+    w("## Слой 4 — Образ автора (тон, регистр) — сигналы\n")
+    w("**Маркеры тона / иронии:**")
     if markers or emojis:
         for m, n in markers.most_common():
             w(f"- `{m}` — {n} раз")
@@ -238,65 +490,52 @@ def main():
             w(f"- {e} — {n} раз")
     else:
         w("- маркеров иронии/эмодзи не найдено — нейтральный регистр")
-    w("")
-
-    w("## Пунктуационные привычки")
-    w(f"- Тире (—/--): {em_dash}  |  Многоточие: {ellipsis}  |  Скобки-вставки: {parens}")
-    w(f"- Восклицания: {exclaim}  |  Вопросы: {question}  |  Сокращения (don't/it's): {contractions}")
-    w("")
-
-    w("## Характерные обороты (n-граммы, ≥3 раз)")
-    if bigrams or trigrams:
-        for g, n in trigrams[:5]:
-            w(f"- «{g}» — {n} раз")
-        shown_tri = {g for g, _ in trigrams[:5]}
-        for g, n in bigrams[:10]:
-            # не дублировать биграммы, целиком сидящие внутри показанных триграмм
-            if any(g in t for t in shown_tri):
-                continue
-            w(f"- «{g}» — {n} раз")
+    if arrows:
+        w(f"- _(стрелки ×{arrows} — структура/буллеты, НЕ маркер тона)_")
+    reg_total = colloquial + formal
+    if reg_total:
+        w(f"**Регистр:** разговорный {pct(colloquial, reg_total)} ↔ "
+          f"формальный {pct(formal, reg_total)} "
+          f"(маркеров: {colloquial} разг. / {formal} форм.)")
     else:
-        w("- устойчивых оборотов не найдено (мало образцов или очень разнообразный текст)")
+        w("**Регистр:** ярких маркеров ни разговорного, ни формального — нейтральный")
     w("")
 
-    w("## Начала и концовки")
-    if openers:
-        w("- Первые слова предложений: " + ", ".join(f"«{wd}»×{n}" for wd, n in openers))
-    else:
-        w("- повторяющихся первых слов не найдено")
-    w("- Концовки образцов: " + ", ".join(
-        f"{kind} {pct(n, total_samples)}" for kind, n in endings.most_common()))
-    w("")
-
-    w("## Топ частотных слов (без стоп-слов)")
-    w(", ".join(f"{wd}×{n}" for wd, n in top_words) or "—")
-    w("")
-
-    w("## Подсказки для генерации скилла")
+    # ── Подсказки для сборки плагина ──────────────────────────────────────
+    w("## Подсказки для сборки voice-плагина\n")
     if avg_len < 200:
         w("- Короткий формат доминирует → основной канал «чат/реплики».")
     else:
         w("- Длинный формат → основной канал «посты/лонгриды».")
+    if rhythm['cv'] >= 0.8:
+        w(f"- §2 Паттерны интонации: явно «чередуй рубленые и длинные» "
+          f"(CV={rhythm['cv']:.2f}).")
+    if fw_over:
+        top_fw = ", ".join(f"«{wd}»" for wd, _, _ in fw_over[:5])
+        w(f"- §3 Подпись: автор над-употребляет {top_fw} — это маркер голоса (деиксис/связки/обращение).")
     if fillers:
         top_f = ", ".join(f"«{x}»" for x, _ in fillers.most_common(4))
-        w(f"- Обязательные вводные в финальном скилле: {top_f}.")
+        w(f"- §3 Обязательные вводные — {top_f}.")
+    sig = [g for g, _, _ in styl_show[:4]]
+    if sig:
+        w("- §3 Фирменные обороты (дословно): " + ", ".join(f"«{g}»" for g in sig) + ".")
     if emojis or markers:
         top_m = ", ".join(f"`{x}`" for x, _ in (markers + emojis).most_common(3))
-        w(f"- Маркеры иронии для тональности «ироничнее»: {top_m}.")
-    if bigrams or trigrams:
-        top_tri = trigrams[:2]
-        tri_set = {g for g, _ in top_tri}
-        top_bi = [(g, c) for g, c in bigrams if not any(g in t for t in tri_set)][:3]
-        top_g = ", ".join(f"«{g}»" for g, _ in (top_tri + top_bi))
-        w(f"- Характерные обороты для секции голоса: {top_g}.")
-    if openers:
-        top_o = ", ".join(f"«{wd}»" for wd, _ in openers[:3])
-        w(f"- Типичные открытия мысли: {top_o}.")
+        w(f"- §2/тональность «ироничнее»: реальные маркеры — {top_m}.")
+    contrast_openers = [wd for wd, _ in openers if wd in CONTRAST_OPENERS][:3]
+    if contrast_openers:
+        w("- §2 Как открывает мысль: " + ", ".join(f"«{wd}»" for wd in contrast_openers) + ".")
     no_dot = endings.get("без знака", 0) + endings.get("скобка/смайл", 0) + endings.get("эмодзи", 0)
+    if endings.get("вопрос", 0) > total_samples / 4:
+        w(f"- §2 Концовки: часто заканчивает вопросом ({pct(endings.get('вопрос', 0), total_samples)}) "
+          f"→ вопрос-ловушка в финале.")
     if no_dot > total_samples / 2:
-        w("- Автор обычно НЕ ставит точку в конце → не заканчивать тексты «причёсанной» точкой.")
+        w("- §2 Концовки: автор обычно НЕ ставит точку → не «причёсывать» финал точкой.")
+    if reg_total and colloquial > formal * 2:
+        w("- §3 Регистр: голос разговорный → формальные обороты в §6 Табу.")
     if em_dash > total_samples:
-        w("- Автор САМ активно использует тире → не баним тире жёстко, только защищаем от AI-накопления.")
+        w("- Тире-исключение: автор САМ активно сыплет тире → в голосе это норма, "
+          "не баним (базовый анти-слой тире не любит — пометить явно).")
     print("\n".join(out))
 
 
