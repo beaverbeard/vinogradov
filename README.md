@@ -130,10 +130,10 @@ python3 ~/.claude/skills/vinogradov/scripts/analyze_corpus.py /tmp/corpus.txt
 |------|------|
 | [Бахтин](https://github.com/beaverbeard/bakhtin) | Генерация черновика (multi-agent, 7 форматов) |
 | [Чуковский](https://github.com/beaverbeard/chukovsky) | Смысл, структура, голос, канцелярит |
-| [Розенталь](https://github.com/beaverbeard/rozental) | Орфография, пунктуация, единообразие |
-| [Слопотрон](https://github.com/beaverbeard/slopotron) | AI-маркеры и нейрослоп |
-| [Мильчин](https://github.com/beaverbeard/milchin) | Типографика и юникод-гигиена |
 | [Аграновский](https://github.com/beaverbeard/agranovsky) | Верификация фактов |
+| [Слопотрон](https://github.com/beaverbeard/slopotron) | AI-маркеры и нейрослоп |
+| [Розенталь](https://github.com/beaverbeard/rozental) | Орфография, пунктуация, единообразие |
+| [Мильчин](https://github.com/beaverbeard/milchin) | Типографика и юникод-гигиена |
 
 ## Лицензия
 
