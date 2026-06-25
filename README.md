@@ -121,11 +121,14 @@ python3 ~/.claude/skills/vinogradov/scripts/analyze_corpus.py /tmp/corpus.txt
 
 ## Родственные скилы
 
-Виноградов собирает **голос**; вычитку текста закрывает семья редакторских скилов
+Виноградов собирает **голос**; этим голосом пишет черновик
+[Бахтин](https://github.com/beaverbeard/bakhtin) (multi-agent генератор), а
+вычитку закрывает семья редакторских скилов
 [рИИдактор](https://redaktozavr.ru/rAIdactor?utm_source=skills):
 
 | Скил | Зона |
 |------|------|
+| [Бахтин](https://github.com/beaverbeard/bakhtin) | Генерация черновика (multi-agent, 7 форматов) |
 | [Чуковский](https://github.com/beaverbeard/chukovsky) | Смысл, структура, голос, канцелярит |
 | [Розенталь](https://github.com/beaverbeard/rozental) | Орфография, пунктуация, единообразие |
 | [Слопотрон](https://github.com/beaverbeard/slopotron) | AI-маркеры и нейрослоп |
