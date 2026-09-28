@@ -134,6 +134,9 @@ python3 ~/.claude/skills/vinogradov/scripts/analyze_corpus.py /tmp/corpus.txt
 | [Слопотрон](https://github.com/beaverbeard/slopotron) | AI-маркеры и нейрослоп |
 | [Розенталь](https://github.com/beaverbeard/rozental) | Орфография, пунктуация, единообразие |
 | [Мильчин](https://github.com/beaverbeard/milchin) | Типографика и юникод-гигиена |
+| [Редколлегия](https://github.com/beaverbeard/redkollegiya) | Оркестратор: гоняет текст через всю цепочку и сводит решения в один протокол |
+
+Всю цепочку одним вызовом запускает **[Редколлегия](https://github.com/beaverbeard/redkollegiya)**: сама выбирает режим, держит порядок и сводит находки в один отчёт.
 
 ## Лицензия
 
