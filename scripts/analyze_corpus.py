@@ -18,13 +18,16 @@
     встречаются) — иначе фраза, повторённая в одном посте, лезет в «подпись»;
   - функциональные слова даются как ОТКЛОНЕНИЕ от нормы русского (мини-Burrows):
     различает не сырая частота «и/в/не», а над/недо-употребление;
-  - стрелки и вариейшн-селекторы не считаются маркерами иронии.
+  - стрелки и вариейшн-селекторы не считаются маркерами иронии;
+  - точка в сокращении/инициале не рвёт предложение, ссылки и @упоминания вырезаются до
+    подсчёта (иначе ритм и словарь считаются по мусору).
 
 Зависимостей нет (только stdlib). Язык корпуса любой (списки — RU-first + EN).
 
 Использование:
     python3 analyze_corpus.py samples.txt
     cat samples.txt | python3 analyze_corpus.py -
+    python3 analyze_corpus.py --selftest     # регрессия токенизатора
 
 Разделитель образцов: строка из одних дефисов/равно (--- или ===),
 иначе — пустая строка. Если ничего не найдено, каждая строка = образец.
@@ -97,6 +100,41 @@ EMOJI_SKIP = {"️", "︎", "‍"}  # variation selectors, ZWJ — не эмод
 WORD_RE = re.compile(r"[\w'’-]+", re.UNICODE)
 SENT_SPLIT_RE = re.compile(r"[.!?…]+(?:\s|$)")
 
+# Гигиена токенизатора: точка в сокращении или инициале — не конец предложения, а
+# ссылка/упоминание — не слова автора. Без этого «т. е.», «3 тыс. руб.», «М. Ю. Гасунс»
+# режут предложение на обрывки по 1–2 слова и искажают ритм (burstiness, доля коротких) —
+# ровно те числа, что идут дальше в отчёт по синтаксису.
+URL_RE = re.compile(r"(?:https?://|www\.|\bt\.me/)\S+?(?=[.,;:!?)»\]]*(?:\s|$))", re.I)
+EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+MENTION_RE = re.compile(r"(?<![\w@])@\w+")
+ABBREV_DOT_RE = re.compile(
+    r"(?<![\w.])(?:руб|коп|тыс|млн|млрд|трлн|др|пр|см|ср|напр|гг|вв|ул|стр|гл|рис|табл|им|мин|сек"
+    r"|обл|проф|акад|доц|тел|англ|рус|лат|прим|ред|изд|вып|кн|пер|сокр|искл)\.", re.I)
+SINGLE_LETTER_DOT_RE = re.compile(r"(?<![\w.])[а-юё]\.")            # т. е., к. ф. н., г., в. (кроме «я.»)
+INITIAL_DOT_RE = re.compile(r"(?<![\w.])[А-ЯЁA-Z]\.(?=\s*[А-ЯЁA-Z])")  # М. Ю. Гасунс
+_PROTECTED_DOT = "․"   # «точка-лидер»: не матчится SENT_SPLIT_RE и не входит в \w
+FINAL_ABBREV_RE = re.compile("((?i:т)" + _PROTECTED_DOT + r"\s?(?i:[дп])|(?<!\w)(?i:др|пр))"
+                             + _PROTECTED_DOT + r"(?=\s+[А-ЯЁA-Z«\"—])")  # без re.I: нужна именно заглавная
+
+
+def strip_links(text):
+    """Убрать URL, e-mail и @упоминания. Возвращает (текст, сколько вырезано)."""
+    n = 0
+    for rx in (URL_RE, EMAIL_RE, MENTION_RE):
+        text, k = rx.subn("", text)
+        n += k
+    return re.sub(r"[ \t]{2,}", " ", text), n
+
+
+def split_sentences(text):
+    """Предложения с защитой точек в сокращениях и инициалах."""
+    for rx in (ABBREV_DOT_RE, SINGLE_LETTER_DOT_RE, INITIAL_DOT_RE):
+        text = rx.sub(lambda m: m.group(0)[:-1] + _PROTECTED_DOT, text)
+    # «и т. д.», «и т. п.», «и др.» обычно закрывают предложение: перед заглавной — это конец
+    text = FINAL_ABBREV_RE.sub(lambda m: m.group(1) + ".", text)
+    return SENT_SPLIT_RE.split(text)
+
+
 # Стоп-слова, чтобы топ частотных слов был осмысленным (RU + EN, базовый набор).
 STOPWORDS = set("""
 и в во не что он на я с со как а то все она так его но да ты к у же вы за бы по
@@ -166,8 +204,8 @@ def ngram_counts(samples, n, min_count=3, min_df=2):
     doc = Counter()
     for s in samples:
         seen = set()
-        for sent in SENT_SPLIT_RE.split(s.lower()):
-            tokens = WORD_RE.findall(sent)
+        for sent in split_sentences(s):   # делить ДО lower(): инициалы и конец «т. д.» видны по заглавной
+            tokens = WORD_RE.findall(sent.lower())
             for i in range(len(tokens) - n + 1):
                 gram = tokens[i:i + n]
                 if all(t in STOPWORDS for t in gram):
@@ -187,7 +225,7 @@ def sentence_openers(samples, min_count=2):
     openers = Counter()
     total = 0
     for s in samples:
-        for sent in SENT_SPLIT_RE.split(s):
+        for sent in split_sentences(s):
             tokens = WORD_RE.findall(sent)
             if tokens:
                 openers[tokens[0].lower()] += 1
@@ -220,7 +258,7 @@ def sentence_lengths(samples):
     """Длины всех предложений в словах — основа ритма."""
     lengths = []
     for s in samples:
-        for part in SENT_SPLIT_RE.split(s):
+        for part in split_sentences(s):
             part = part.strip()
             if part:
                 lengths.append(len(WORD_RE.findall(part)))
@@ -295,7 +333,7 @@ def paragraph_stats(samples):
         return None
     sent_per_para = []
     for p in paras:
-        sents = [x for x in SENT_SPLIT_RE.split(p) if x.strip()]
+        sents = [x for x in split_sentences(p) if x.strip()]
         sent_per_para.append(max(1, len(sents)))
     one_liners = sum(1 for x in sent_per_para if x == 1)
     return {
@@ -306,13 +344,45 @@ def paragraph_stats(samples):
     }
 
 
+def selftest():
+    """Регрессия токенизатора (без корпуса)."""
+    cases = [
+        ("Встреча в 19:00, т. е. через час. Цена 3 тыс. руб. за занятие.", 2),
+        ("Ведёт к. ф. н. М. Ю. Гасунс. Пишите.", 2),
+        ("Ну и т. д. и т. п. Потом решим.", 2),
+        ("Это был я. Потом ушёл!", 2),
+        ("Сайт https://example.com/page. Второе предложение? Третье…", 3),
+        ("Стоимость 2 млн. руб. в год, см. прайс. Всё.", 2),
+    ]
+    fails = []
+    for text, want in cases:
+        clean, _ = strip_links(text)
+        got = len([x for x in split_sentences(clean) if x.strip()])
+        if got != want:
+            fails.append(f"«{text}»: {got} предл., ждали {want}")
+    clean, n = strip_links("пишите @rusamskrtam или на a.b@mail.ru, см. t.me/samskrte/60.")
+    if n != 3 or "rusamskrtam" in clean or "samskrte" in clean or not clean.rstrip().endswith("."):
+        fails.append(f"strip_links: n={n}, «{clean}»")
+    total = len(cases) + 1
+    if fails:
+        print(f"selftest: FAIL {total - len(fails)}/{total}\n  " + "\n  ".join(fails))
+        return 1
+    print(f"selftest: PASS {total}/{total}")
+    return 0
+
+
 def main():
+    if len(sys.argv) >= 2 and sys.argv[1] == "--selftest":
+        sys.exit(selftest())
     if len(sys.argv) < 2:
         print("usage: analyze_corpus.py <file|->", file=sys.stderr)
         sys.exit(1)
 
     raw = read_input(sys.argv[1])
     samples = split_samples(raw)
+    cleaned = [strip_links(x) for x in samples]
+    links_removed = sum(n for _, n in cleaned)
+    samples = [x.strip() for x, _ in cleaned if x.strip()]
     if not samples:
         print("Корпус пуст — нечего анализировать.", file=sys.stderr)
         sys.exit(1)
@@ -382,7 +452,8 @@ def main():
     w = out.append
     w("# Voice DNA — отчёт по корпусу (авторский стиль по 4 слоям Виноградова)\n")
     w(f"**Образцов:** {total_samples}  |  **Символов:** {len(joined)}  |  "
-      f"**Слов:** {richness['tokens']}  |  df-порог оборотов: ≥{min_df} образцов\n")
+      f"**Слов:** {richness['tokens']}  |  df-порог оборотов: ≥{min_df} образцов  |  "
+      f"ссылок/@/e-mail вырезано до подсчёта: {links_removed}\n")
 
     # ── Слой 1. Лексический ───────────────────────────────────────────────
     w("## Слой 1 — Лексический (словарный отпечаток)\n")
