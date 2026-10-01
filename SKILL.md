@@ -76,8 +76,8 @@ Telegram (`extract_telegram.py`). Дать и короткие реплики, �
 
 ### Шаг 3 — Анализ
 ```bash
-python3 ~/.claude/skills/vinogradov/scripts/analyze_corpus.py /tmp/corpus.txt
-python3 ~/.claude/skills/vinogradov/scripts/analyze_corpus.py --selftest   # регрессия токенизатора после правок
+python3 ${CLAUDE_SKILL_DIR}/scripts/analyze_corpus.py /tmp/corpus.txt
+python3 ${CLAUDE_SKILL_DIR}/scripts/analyze_corpus.py --selftest   # регрессия токенизатора после правок
 ```
 Отчёт даёт реальные числа по 4 слоям. **Не выдумывать статистику** — брать из отчёта.
 

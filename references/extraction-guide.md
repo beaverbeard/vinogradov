@@ -34,7 +34,7 @@
 ## Часть 2. Анализ
 
 ```bash
-python3 ~/.claude/skills/vinogradov/scripts/analyze_corpus.py /tmp/corpus.txt
+python3 <папка скила vinogradov>/scripts/analyze_corpus.py /tmp/corpus.txt
 ```
 
 Отчёт разложен по 4 слоям авторского стиля. Числа — только из отчёта, не выдумывать.
