@@ -9,6 +9,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-da7756.svg)](https://docs.claude.com/en/docs/claude-code/overview)
 
+**In English.** Vinogradov builds an author's voice from real texts, tuned for **Russian**. Give it 5–20 of your texts: the bundled script `scripts/analyze_corpus.py` measures them locally (function words as a signature, rhythm and sentence-length burstiness, TTR/Yule's K, stylistic vs. topical n-grams), and Claude turns the four-layer report into a voice skill saved to `~/.claude/skills/voice-<name>/` for writing in that style. An optional helper extracts one author's messages from a Telegram Desktop JSON export you provide. Scripts use Python's standard library only; no network access.
+
+
 Имя — В.В. Виноградов, основатель учения об **авторском стиле** и «образе автора»
 (сам термин «идиостиль» оформился в науке уже после него).
 Даёте 5–20 своих текстов — скил их измеряет (служебные слова как подпись, ритм,

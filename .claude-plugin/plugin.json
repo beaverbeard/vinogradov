@@ -1,8 +1,8 @@
 {
   "name": "vinogradov",
   "displayName": "Виноградов",
-  "version": "1.0.0",
-  "description": "Фабрика авторских голосов: измеряет идиостиль по корпусу текстов (стилометрия по четырём слоям) и собирает voice-скил для письма в этом стиле.",
+  "version": "1.0.1",
+  "description": "Author voice factory: measures idiostyle from a corpus of texts (four-layer stylometry) and builds a voice skill for writing in that style. Tuned for Russian.",
   "author": {
     "name": "Rodion Scryabin (beaverbeard)",
     "url": "https://github.com/beaverbeard"
