@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "profile_version": "0.1.0",
+  "built": "2026-11-25",
+  "canonical_repository": "https://github.com/beaverbeard/vinogradov",
+  "canonical_path": "references/neutral-base.md",
+  "profile_sha256": "aa26bc30043e9a2d32ef67b48956312cf51b3eabcb53b9039736588e4eaab67b",
+  "calibration_example_sha256": "863929d4b96d13e8c3eeb7bf029ff6178a2ff48e8f60699f04d324e0e6d04c74",
+  "sources": [
+    {
+      "id": "01",
+      "url": "https://lifehacker.ru/slepota-k-besporyadku/",
+      "title": "Слепота к беспорядку: почему мы не замечаем бардак в доме и как это исправить",
+      "authors": [
+        "Таня Чудак"
+      ],
+      "displayed_date": "2026-11-21T14:00:00+03:00",
+      "split": "train",
+      "clean_sha256": "bf7ba107ccf7a914f588a459f5e80b95b190f02c3930aeae9dd540f41aaffea5"
+    },
+    {
+      "id": "02",
+      "url": "https://lifehacker.ru/prilozheniya-shagomery-android/",
+      "title": "9 приложений-шагомеров для Android, которые помогут стать активнее",
+      "authors": [
+        "Артём Козориз"
+      ],
+      "displayed_date": "2026-11-23T11:00:00+03:00",
+      "split": "train",
+      "clean_sha256": "2febdade444a7aa4da2a5aab0aa43b70e729b22f62ab7f4752241bcab6b5d327"
+    },
+    {
+      "id": "03",
+      "url": "https://lifehacker.ru/piramida-minto/",
+      "title": "Что такое пирамида Минто и как с её помощью улучшить навыки коммуникации",
+      "authors": [
+        "Таня Чудак"
+      ],
+      "displayed_date": "2026-06-08T11:00:02+03:00",
+      "split": "train",
+      "clean_sha256": "ba2117613a2647902ce4339952e44410db37feaee09a2f76223625b8a43ff16a"
+    },
+    {
+      "id": "04",
+      "url": "https://lifehacker.ru/kak-delat-uborku-po-metodu-5-x-5/",
+      "title": "Как делать уборку по методу 5 × 5",
+      "authors": [
+        "Таня Чудак"
+      ],
+      "displayed_date": "2026-10-17T13:00:00+03:00",
+      "split": "train",
+      "clean_sha256": "703251b5f4ed2fe02cd89ebaf00f8f0041b07af8ddcb59681a3598f7eaf1df83"
+    },
+    {
+      "id": "05",
+      "url": "https://lifehacker.ru/pochemu-xoroshie-lyudi-postupayut-ploxo/",
+      "title": "7 причин, почему хорошие люди совершают плохие поступки",
+      "authors": [
+        "Таня Чудак"
+      ],
+      "displayed_date": "2026-05-13T15:00:06+03:00",
+      "split": "train",
+      "clean_sha256": "dd01a7207f4195b7b568b4af8ffccb1aff83e392978793cb4ad6feaf15835bf8"
+    },
+    {
+      "id": "06",
+      "url": "https://lifehacker.ru/detskie-ustanovki/",
+      "title": "6 установок, которые ребёнок незаметно перенимает у родителей",
+      "authors": [
+        "Таня Чудак"
+      ],
+      "displayed_date": "2026-01-09T11:00:05+03:00",
+      "split": "train",
+      "clean_sha256": "87829e50649b7b4f9e53893a55ae3e201fd1220eb3214a871059cea4ffe57246"
+    },
+    {
+      "id": "07",
+      "url": "https://lifehacker.ru/pravilo-3-3-3/",
+      "title": "Что такое правило 3–3–3 и как его использовать для продуктивности",
+      "authors": [
+        "Таня Чудак"
+      ],
+      "displayed_date": "2025-10-13T10:00:00+03:00",
+      "split": "holdout",
+      "clean_sha256": "0ea3add50fe2bb123d6dda0fa5b445cb3e6beaf4bde6189c265b0a85ef9844b4"
+    },
+    {
+      "id": "08",
+      "url": "https://lifehacker.ru/motivaciya-kompetentnosti/",
+      "title": "Что такое мотивация компетентности и как она поможет вам развиваться",
+      "authors": [
+        "Наталья Небогатова"
+      ],
+      "displayed_date": "2026-08-26T11:00:00+03:00",
+      "split": "train",
+      "clean_sha256": "5f4deb7828e4e7eb16a3c19a99771e9e07023cb5abe611c0bffb453fbf04b1d9"
+    }
+  ],
+  "measured_training_prose": {
+    "samples": 7,
+    "words": 6364,
+    "sentences": 396,
+    "rhythm": {
+      "mean": 16.07070707070707,
+      "std": 6.28370109887883,
+      "cv": 0.3910033996159675
+    },
+    "paragraphs": {
+      "paras": 157,
+      "avg_chars": 285.4267515923567,
+      "avg_sents": 2.5859872611464967,
+      "one_liner_share": 0.12738853503184713
+    }
+  },
+  "limitations": [
+    "Eight articles; six by one author; provisional general editorial profile",
+    "One model-written example accepted by the user; no independent family LLM/E2E evaluation",
+    "Full source articles and local raw snapshots are not distributed"
+  ],
+  "rights": "Short attributed quotations from Lifehacker are included for stylistic analysis; source articles are not relicensed under this repository MIT license."
+}
