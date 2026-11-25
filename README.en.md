@@ -110,6 +110,18 @@ Learn to give clearer briefs, retain your own voice and spot invented details. T
 [Subscribe to the newsletter →](https://redaktozavr.ru/rAIdactor?utm_source=skills)
 
 
+## The person behind the name
+
+<img src="assets/people/vinogradov.jpg" alt="Viktor Vladimirovich Vinogradov" align="right" width="128" hspace="12">
+
+**Viktor Vladimirovich Vinogradov (1894–1969)**
+
+Viktor Vinogradov was a linguist and literary scholar who studied how a distinctive authorial style takes shape in a text. His concept of the ‘image of the author’ helps explain why writing is recognisable through its vocabulary, tone and narrative structure, as well as its plot. It connects individual choices into an overall style. We named this skill after him because it analyses your writing and builds a voice profile that helps AI write in your style.
+
+<br clear="all">
+
+Photo: Vsevolod Tarasevich · [source and terms](assets/people/CREDITS.md).
+
 ## Compatibility and source
 
 Check the tools available in your app when setting up. The English page translates the documentation.
