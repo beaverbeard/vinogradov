@@ -17,5 +17,97 @@
   "license_url": "https://creativecommons.org/licenses/by/4.0",
   "rights_status": "commons_free_license",
   "changes": "none; original file downloaded byte-for-byte",
-  "http_status": 200
+  "http_status": 200,
+  "card_renders": [
+    {
+      "slug": "vinogradov",
+      "lang": "ru",
+      "layout": "wide",
+      "theme": "light",
+      "file": "biography-ru-light.png",
+      "width": 1280,
+      "height": 588,
+      "sha256": "943c27bf9d8ba498c33a870c84e71cf70758bd408812c19463462af720ab6bbb",
+      "portrait_sha256": "477e2e77361eb5bf629072fb8f8a9b0dc84904141f109c5f195a4b037c45eb0f"
+    },
+    {
+      "slug": "vinogradov",
+      "lang": "ru",
+      "layout": "wide",
+      "theme": "dark",
+      "file": "biography-ru-dark.png",
+      "width": 1280,
+      "height": 588,
+      "sha256": "92a47dfd757b4daeaf4e88f0e24e02b470e2f511388d43bbde695397b8635c1e",
+      "portrait_sha256": "477e2e77361eb5bf629072fb8f8a9b0dc84904141f109c5f195a4b037c45eb0f"
+    },
+    {
+      "slug": "vinogradov",
+      "lang": "ru",
+      "layout": "mobile",
+      "theme": "light",
+      "file": "biography-ru-light-mobile.png",
+      "width": 840,
+      "height": 1057,
+      "sha256": "a006ca14fcc652fb2c75d5dbc6a37e8df62c8ba3f0fea162bb7d56c7b4208a36",
+      "portrait_sha256": "477e2e77361eb5bf629072fb8f8a9b0dc84904141f109c5f195a4b037c45eb0f"
+    },
+    {
+      "slug": "vinogradov",
+      "lang": "ru",
+      "layout": "mobile",
+      "theme": "dark",
+      "file": "biography-ru-dark-mobile.png",
+      "width": 840,
+      "height": 1057,
+      "sha256": "6176edfbc0a31a6a16443a5ee9caa06350d50e9e23a7d2f703ae1561ee0f0095",
+      "portrait_sha256": "477e2e77361eb5bf629072fb8f8a9b0dc84904141f109c5f195a4b037c45eb0f"
+    },
+    {
+      "slug": "vinogradov",
+      "lang": "en",
+      "layout": "wide",
+      "theme": "light",
+      "file": "biography-en-light.png",
+      "width": 1280,
+      "height": 545,
+      "sha256": "dd0990f77716ffb5121f56dc7b9d1048df67c1a8e49c44f8cc7ca7becf6ef8e5",
+      "portrait_sha256": "477e2e77361eb5bf629072fb8f8a9b0dc84904141f109c5f195a4b037c45eb0f"
+    },
+    {
+      "slug": "vinogradov",
+      "lang": "en",
+      "layout": "wide",
+      "theme": "dark",
+      "file": "biography-en-dark.png",
+      "width": 1280,
+      "height": 545,
+      "sha256": "5d8b3b006e3efa504bfc3285fd42b0e48eac14b57711cbe2ea50645ce3ac64a1",
+      "portrait_sha256": "477e2e77361eb5bf629072fb8f8a9b0dc84904141f109c5f195a4b037c45eb0f"
+    },
+    {
+      "slug": "vinogradov",
+      "lang": "en",
+      "layout": "mobile",
+      "theme": "light",
+      "file": "biography-en-light-mobile.png",
+      "width": 840,
+      "height": 951,
+      "sha256": "720d459609814efc77a5fdfccb3e5aa92acd19b3220f4fb3459f7d8ebe6a76e3",
+      "portrait_sha256": "477e2e77361eb5bf629072fb8f8a9b0dc84904141f109c5f195a4b037c45eb0f"
+    },
+    {
+      "slug": "vinogradov",
+      "lang": "en",
+      "layout": "mobile",
+      "theme": "dark",
+      "file": "biography-en-dark-mobile.png",
+      "width": 840,
+      "height": 951,
+      "sha256": "0c8f3a7220f4f948704f686252235f280a244930bfcebf177fd9ae697347b97b",
+      "portrait_sha256": "477e2e77361eb5bf629072fb8f8a9b0dc84904141f109c5f195a4b037c45eb0f"
+    }
+  ],
+  "card_layout": "separate portrait and text blocks; mobile paragraph below the portrait/name row",
+  "card_font": "Onest Regular/Bold"
 }

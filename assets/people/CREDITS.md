@@ -7,7 +7,7 @@
 - Author: Vsevolod Tarasevich
 - Date: between 1963 and 1964
 - License / status as stated by the source: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0)
-- Changes: none. The source image has not been edited.
+- Portrait changes: none. The card adds typography and layout around the original photograph.
 - SHA-256: `477e2e77361eb5bf629072fb8f8a9b0dc84904141f109c5f195a4b037c45eb0f`
 
 The repository’s MIT license does not replace the photograph’s separate terms.
