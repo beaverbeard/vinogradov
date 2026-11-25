@@ -1,0 +1,6 @@
+interface:
+  display_name: "Виноградов"
+  short_description: "Помогает ИИ писать в вашем стиле"
+  icon_small: "./assets/brand/icon-vinogradov.svg"
+  icon_large: "./assets/brand/icon-vinogradov.png"
+  brand_color: "#EE402C"
